@@ -37,17 +37,15 @@ export interface IFormOptions{ handlePersist?:(newData:any)=>any, useStorage:boo
 
 //Send "_form" key vSchema to validate hole form
 export const useFormValid=(formDatas:IFormDatas, validate=true,options?:IFormOptions):Array<any>=>{
-    //console
-    if(typeof window!=="undefined"  && typeof localStorage!=="undefined" && typeof sessionStorage!==undefined){
         let {handlePersist, useStorage, storageKey, storageObject, useStringifyMethod, strictCopy=true}:any=options ?? {}
         //Local Storage
-        storageObject=storageObject??  sessionStorage
+        storageObject=storageObject ??  sessionStorage
         const getStoreValue=(keys?:Array<string>)=>{
-            if(useStorage && storageKey){
+            if(useStorage && storageKey && storageObject){
                 let data:any=  storageObject.getItem(storageKey)
                 let parsedData=useStringifyMethod ? JSON.parse(data):data
                 if(strictCopy){
-                    let d={}
+                    let d:any={}
                     for(let i in parsedData){
                         if(keys){
                             if(keys.includes(i)) d[i]=parsedData[i];
@@ -63,25 +61,32 @@ export const useFormValid=(formDatas:IFormDatas, validate=true,options?:IFormOpt
         }
         //Local Storage
         const [form, setForm]:any=React.useState({...getStoreValue(Object.keys(formDatas)),...formDatas})
+        
         const getHelperTextOn=(prop:string)=>form[prop].error && !form[prop].valid ? form[prop].errorMessage ?? form[prop].error.message : (form[prop].value.length && form[prop].valid ?"": form[prop].help ?? "" )
         const isErrorOn=(prop:any)=>!form[prop] || form[prop].valid ===undefined ? undefined : isNaN(form[prop].valid)? false : !form[prop].valid
 
         //Validate form witj joi
         const validateForm=(joiSchema:any, value:any, fieldData:IForm)=>{
+            //console.log('simple')
             //handleCustom validation
             //if no custom validation defined set valid to true
             const customValidationResult=fieldData?.customValidation instanceof Function ? fieldData.customValidation(value, getValues()) : true;
             //if schema defined
+            
             if(joiSchema){
-                const result=joiSchema.validate(value);
-                //if there is an error return valid:false
-                if(result.error){
-                    return {valid: false, error: result.error}
-
-                }
+               if(Boolean(value)){
+                    const result=joiSchema.validate(value);
+                    //if there is an error return valid:false
+                    if(result.error){
+                        return {valid: false, error: result.error}
+                    }
+               }else{
+                    return {valid:undefined}
+               }
+               
             }
             if(fieldData && fieldData.sameAs){
-                if(!(value===form[fieldData.sameAs].value)){
+                if((value!==form[fieldData.sameAs].value)){
                     return {valid: false, error: {message:"Champs non conformes."}}; 
                 }
             }
@@ -90,7 +95,7 @@ export const useFormValid=(formDatas:IFormDatas, validate=true,options?:IFormOpt
 
         //Add field to form
         const addField=(name:string, config:IForm)=>{
-            setForm((prev)=>({...prev, [name]:config}))
+            setForm((prev:any)=>({...prev, [name]:config}))
         }
         
 
@@ -117,7 +122,7 @@ export const useFormValid=(formDatas:IFormDatas, validate=true,options?:IFormOpt
                         if(prev._form?.vSchema){
                             d["_form"]={...prev._form, ...validateForm(form._form.vSchema, getValues(d), prev._form)}
                         }
-                        if(handlePersist instanceof Function) return d;
+                        if(handlePersist instanceof Function) return handlePersist(d);
                         return d
                     
                     })
@@ -179,7 +184,7 @@ export const useFormValid=(formDatas:IFormDatas, validate=true,options?:IFormOpt
 
         //Save form data to a Storage object or interface
         const saveToStore=(d:any)=>{
-            if(useStorage && storageKey){
+            if(useStorage && storageKey && storageObject){
                 let data:any=  storageObject.getItem(storageKey)
                 data=data ? useStringifyMethod ? JSON.parse(data) : data: {}
                 data={...data, ...d}
@@ -192,6 +197,7 @@ export const useFormValid=(formDatas:IFormDatas, validate=true,options?:IFormOpt
 
         //Form handler based on value or function
         const handleFormValue=function (name:any, value:any|((prevState:any)=>any)){
+            //console.log('simple')
             setForm((prev:any)=>{
                 value=value instanceof Function ? value(prev[name]) : value
                 value=prev[name]?.transformValue instanceof Function ? prev[name]?.transformValue(value, prev) :value
@@ -209,6 +215,7 @@ export const useFormValid=(formDatas:IFormDatas, validate=true,options?:IFormOpt
 
         //Form handler array
         const handleFormValues=function (values:{[x:string]:((prevState:any)=>any)|any}){
+            //console.log('simple')
             setForm((prev:any)=>{
                 let d={...prev,...getStoreValue(Object.keys(formDatas))};
                 for(let i in values){
@@ -230,7 +237,7 @@ export const useFormValid=(formDatas:IFormDatas, validate=true,options?:IFormOpt
         //Clear Storage object
         const clearStore=()=>{
             
-            if(useStorage && storageKey ){
+            if(useStorage && storageKey && storageObject ){
                 const localStorageData=storageObject.getItem(storageKey)
                 const localStorageDatas=localStorageData ? useStringifyMethod ? JSON.parse(localStorageData) : localStorageData  : null
                 const formDataKeys=Object.keys(formDatas)
@@ -260,6 +267,4 @@ export const useFormValid=(formDatas:IFormDatas, validate=true,options?:IFormOpt
         }, [])
 
         return [form, {handleForm, handleFormValue,addField, handleFormValues,getHelperTextOn, isErrorOn, getErrors, isFormValid, clearStore, getValues, reset}];
-   }
-   return [formDatas, {handleForm:()=>{}, addField:()=>{}, handleFormValue:()=>{},handleFormValues:()=>{}, getHelperTextOn:()=>{}, isErrorOn:()=>{},isFormValid:()=>{},clearStore:()=>{}, getValues:()=>{}, getErrors:()=>{}, reset:()=>{}}];
 }
